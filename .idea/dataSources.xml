@@ -8,5 +8,12 @@
       <jdbc-url>jdbc:sqlite:C:\Users\USER22\Music\CAÑON_2G\Fleetify\users.db</jdbc-url>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
+    <data-source source="LOCAL" name="initialize.db" uuid="3b3f9264-b243-4ba8-8341-bbac5748fff3">
+      <driver-ref>sqlite.xerial</driver-ref>
+      <synchronize>true</synchronize>
+      <jdbc-driver>org.sqlite.JDBC</jdbc-driver>
+      <jdbc-url>jdbc:sqlite:C:\Users\USER22\Music\FLEETIFY_SQLITE-NEW-\initialize.db</jdbc-url>
+      <working-dir>$ProjectFileDir$</working-dir>
+    </data-source>
   </component>
 </project>

@@ -151,4 +151,67 @@ public class initializeDAO {
         }
         return false;
     }
+    public boolean displayroute(){
+        String sql = "SELECT id, origin, destination, status FROM route";
+
+        try (Connection conn = DriverManager.getConnection("jdbc:sqlite:initialize.db");
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+
+            System.out.println("\n=====================================================================================");
+            System.out.println("                               REGISTERED ROUTE LIST                                 ");
+            System.out.println("=====================================================================================");
+            System.out.printf("%-5s | %-18s | %-20s | %-10s\n", "ID", "ORIGIN", "DESTINATION", "Status");
+            System.out.println("-------------------------------------------------------------------------------------");
+
+            boolean route = false;
+
+            while (rs.next()){
+                route = true;
+                System.out.printf("%-5s | %-18s | %-20s | %-10s\n",
+                        rs.getString("id"),
+                        rs.getString("origin"),
+                        rs.getString("destination"),
+                        rs.getString("status")
+                );
+
+            }
+            if(!route){
+                System.out.println("No registered driver found in database.");
+
+            }
+            System.out.println("=====================================================================================");
+
+        }
+        catch (SQLException e){
+            System.out.println("Error displaying." + e.getMessage());
+            return false;
+        }
+        return false;
+    }
+    public static boolean ongoingroute(String id, String origin, String destination, String vehicleType, String driver, String status){
+
+        String sql = "INSERT INTO route(id, origin, destination, vehicle_type, driver status) VALUES (?, ?, ?, ?, ?, ?)";
+
+        try(Connection conn = DatabaseConnection.getOngoingRoute();
+            PreparedStatement pstmt = conn.prepareStatement(sql)){
+
+            pstmt.setString(1, id);
+            pstmt.setString(2, origin);
+            pstmt.setString(3, destination);
+            pstmt.setString(4, vehicleType);
+            pstmt.setString(5, driver);
+            pstmt.setString(6, status);
+
+
+            pstmt.executeUpdate();
+            return true;
+
+        }
+        catch (SQLException e){
+            System.out.println("Database Error: "+ e.getMessage());
+            return false;
+        }
+
+    }
 }

@@ -9,7 +9,7 @@ public class DatabaseConnection {
     private static final String INITIALIZE_DB_URL = "jdbc:sqlite:initialize.db";
 
     public static Connection getUserConnection() throws SQLException {
-        return DriverManager.getConnection(USERS_DB_URL);
+        return DriverManager.getConnection(INITIALIZE_DB_URL);
 
     }
     public static Connection getVehicleConnection() throws SQLException {
@@ -19,6 +19,9 @@ public class DatabaseConnection {
         return DriverManager.getConnection(INITIALIZE_DB_URL);
     }
     public static Connection getRouteConnection() throws  SQLException{
+        return DriverManager.getConnection(INITIALIZE_DB_URL);
+    }
+    public static Connection getOngoingRoute() throws  SQLException{
         return DriverManager.getConnection(INITIALIZE_DB_URL);
     }
 }

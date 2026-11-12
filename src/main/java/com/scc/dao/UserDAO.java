@@ -4,40 +4,115 @@ import java.sql.*;
 
 public class UserDAO {
 
-    private static final String USER_CODE = "FLEETIFY-USER";
+    // Constructor: Automatically verifies and creates the 'users' table on startup
+    public UserDAO() {
+        createTableIfNotExists();
+    }
 
-    public boolean registerUser( String username, String password, String securityCode, String role) {
-
-        if(!USER_CODE.equals(securityCode)){
-            System.out.println("Error: Invalid Security Code. Registration Denied");
-            return false;
-
-        }
-        // Assuming regular users register here
-        String sql = "INSERT INTO user(username, password, securityCode, role, status) VALUES(?, ?, ?, ?, ?)";
+    private void createTableIfNotExists() {
+        String sql = "CREATE TABLE IF NOT EXISTS users (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                "username TEXT UNIQUE NOT NULL, " +
+                "password TEXT NOT NULL, " +
+                "email TEXT, " +
+                "securityCode TEXT, " +
+                "role TEXT NOT NULL, " +
+                "status TEXT NOT NULL)";
 
         try (Connection conn = DatabaseConnection.getUserConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-
-            pstmt.setString(1, username);
-            pstmt.setString(2, password);
-            pstmt.setString(3, securityCode);
-            pstmt.setString(4, role.toUpperCase());
-            pstmt.setString(5, "INACTIVE");
-            pstmt.executeUpdate();
-
-            return true;
-
+             Statement stmt = conn.createStatement()) {
+            stmt.execute(sql);
         } catch (SQLException e) {
-            System.err.println("Failed: " + e.getMessage());
-            return false;
+            System.err.println("Error creating table: " + e.getMessage());
         }
     }
 
-    public boolean login(String username, String password) {
+    // Generates a random 6-digit security code for email verification
+    private String generateSecurityCode() {
+        int code = 100000 + new java.util.Random().nextInt(900000);
+        return String.valueOf(code);
+    }
 
+    private static final String ADMIN_EMAIL = "Kennethcanon99@gmail.com";
 
-        String userSql = "SELECT * FROM user WHERE username = ? AND password = ?";
+    public boolean registerUser(String username, String password, String role) {
+
+        // 1. Check if username already exists in the 'users' table
+        if (isUserExists(username)) {
+            System.out.println("Error: Username '" + username + "' is already taken.");
+            return false;
+        }
+
+        String countSql = "SELECT COUNT(*) FROM users";
+        String insertSql = "INSERT INTO users(username, password, securityCode, role, status) VALUES(?, ?, ?, ?, ?)";
+
+        try (Connection conn = DatabaseConnection.getUserConnection()) {
+
+            // 2. Check table count to determine if this is the very first user
+            int userCount = 1;
+            try (Statement stmt = conn.createStatement();
+                 ResultSet rs = stmt.executeQuery(countSql)) {
+                if (rs.next()) {
+                    userCount = rs.getInt(1);
+                }
+            }
+
+            boolean isFirstUser = (userCount == 0);
+
+            // Reset the auto-increment sequence back if the table is empty
+            if (isFirstUser) {
+                String resetSeqSql = "DELETE FROM sqlite_sequence WHERE name='users'";
+                try (Statement stmt = conn.createStatement()) {
+                    stmt.execute(resetSeqSql);
+                } catch (SQLException e) {
+                    // Ignored if sqlite_sequence table doesn't exist yet
+                }
+            }
+
+            String status = isFirstUser ? "ACTIVE" : "INACTIVE";
+            String securityCode = isFirstUser ? null : generateSecurityCode();
+
+            // 3. Insert the new user into the 'users' table
+            try (PreparedStatement pstmt = conn.prepareStatement(insertSql)) {
+
+                pstmt.setString(1, username);
+                pstmt.setString(2, password);
+                pstmt.setString(3, securityCode);
+                pstmt.setString(4, role.toUpperCase());
+                pstmt.setString(5, status);
+
+                int rowsAffected = pstmt.executeUpdate();
+
+                if (rowsAffected > 0) {
+                    if (isFirstUser) {
+                        System.out.println("\n--------------------------------------------------");
+                        System.out.println(" [SUCCESS] First account created!");
+                        System.out.println(" Status: ACTIVE (Directly logged in, no code required)");
+                        System.out.println("--------------------------------------------------\n");
+                    } else {
+                        // Send security code to the fixed ADMIN email
+                        EmailService.sendSecurityCode(ADMIN_EMAIL, securityCode);
+
+                        System.out.println("\n--------------------------------------------------");
+                        System.out.println(" [SUCCESS] Account created! Status: INACTIVE");
+                        System.out.println(" [SECURITY CODE SENT TO ADMIN EMAIL]: " + ADMIN_EMAIL);
+                        System.out.println("--------------------------------------------------\n");
+
+                        System.out.println("Security code successfully saved to database: " + securityCode);
+                    }
+                    return true;
+                }
+
+            }
+
+        } catch (SQLException e) {
+            System.err.println("Database Registration Failed: " + e.getMessage());
+        }
+
+        return false;
+    }
+    public static boolean login(String username, String password) {
+        String userSql = "SELECT * FROM users WHERE username = ? AND password = ?";
 
         try (Connection conn = DatabaseConnection.getUserConnection();
              PreparedStatement pstmt = conn.prepareStatement(userSql)) {
@@ -47,52 +122,44 @@ public class UserDAO {
 
             try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
-                    // Found in the user table!
-                    System.out.println("Login Success! Welcome User.");
+                    System.out.println("Login Success!");
                     return true;
                 }
             }
         } catch (SQLException e) {
             System.out.println("Database Error checking User: " + e.getMessage());
-            return false;
         }
-
-        // --- STEP 2: If not found in admin, check the USERS table ---
-
         return false;
     }
-    public boolean updateUser (String username,String newRole, String newStatus){
-        String updatesql = "UPDATE user SET role = ?, status = ? WHERE username = ?";
 
-        try (Connection conn = DriverManager.getConnection("jdbc:sqlite:users.db");
-             PreparedStatement pstmt = conn.prepareStatement(updatesql)){
+    public boolean updateUser(String username, String newRole, String newStatus) {
+        String updatesql = "UPDATE users SET role = ?, status = ? WHERE username = ?";
+
+        try (Connection conn = DatabaseConnection.getUserConnection();
+             PreparedStatement pstmt = conn.prepareStatement(updatesql)) {
 
             pstmt.setString(1, newRole);
             pstmt.setString(2, newStatus);
             pstmt.setString(3, username);
 
-            // pstmt.executeUpdate() returns the number of rows changed
-            int rowsAffected = pstmt.executeUpdate();
+            return pstmt.executeUpdate() > 0;
 
-            // If rowsAffected > 0, it means the username existed and was successfully updated!
-            return rowsAffected > 0;
-
-        } catch(SQLException e) {
+        } catch (SQLException e) {
             System.out.println("Error updating user status: " + e.getMessage());
             return false;
         }
     }
-    public void displayAllUsers() {
-        String sql = "SELECT id, username, securityCode, role, status FROM user";
 
-        try (Connection conn = DriverManager.getConnection("jdbc:sqlite:users.db");
+    public void displayAllUsers() {
+        String sql = "SELECT id, username, securityCode, role, status FROM users";
+
+        try (Connection conn = DatabaseConnection.getUserConnection();
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
 
             System.out.println("\n=====================================================================================");
             System.out.println("                               REGISTERED USERS LIST                                 ");
             System.out.println("=====================================================================================");
-            // Formatted header matching your 5 columns
             System.out.printf("%-5s | %-18s | %-16s | %-20s | %-10s\n", "ID", "Username", "Security Code", "Role", "Status");
             System.out.println("-------------------------------------------------------------------------------------");
 
@@ -102,7 +169,7 @@ public class UserDAO {
                 System.out.printf("%-5s | %-18s | %-16s | %-20s | %-10s\n",
                         rs.getString("id"),
                         rs.getString("username"),
-                        rs.getString("securityCode"), // Matches your exact column name
+                        rs.getString("securityCode"),
                         rs.getString("role"),
                         rs.getString("status")
                 );
@@ -117,17 +184,18 @@ public class UserDAO {
             System.out.println("Error displaying users: " + e.getMessage());
         }
     }
-    public boolean isUserExists(String username) {
-        String sql = "SELECT COUNT(*) FROM user WHERE username = ?";
 
-        try (Connection conn = DriverManager.getConnection("jdbc:sqlite:users.db");
+    public boolean isUserExists(String username) {
+        String sql = "SELECT COUNT(*) FROM users WHERE username = ?";
+
+        try (Connection conn = DatabaseConnection.getUserConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
             pstmt.setString(1, username);
-            ResultSet rs = pstmt.executeQuery();
-
-            if (rs.next()) {
-                return rs.getInt(1) > 0; // Returns true if count is greater than 0
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
+                }
             }
 
         } catch (SQLException e) {
@@ -135,32 +203,76 @@ public class UserDAO {
         }
         return false;
     }
-    public String role(String username, String password){
-        String role = null;
-        String query = "SELECT role FROM user WHERE username = ? AND password = ? ";
 
-        try (Connection conn = DriverManager.getConnection("jdbc:sqlite:users.db");
-        PreparedStatement pstmt = conn.prepareStatement((query))){
+    public String role(String username, String password) {
+        String role = null;
+        String query = "SELECT role FROM users WHERE username = ? AND password = ?";
+
+        try (Connection conn = DatabaseConnection.getUserConnection();
+             PreparedStatement pstmt = conn.prepareStatement(query)) {
 
             pstmt.setString(1, username);
             pstmt.setString(2, password);
 
             try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
-                    role = rs.getString("role"); // Only set if user exists
+                    role = rs.getString("role");
                 }
             }
 
-
-        }
-        catch (SQLException e){
-            System.out.println("Database Error!" + e.getMessage());
-
-
-
+        } catch (SQLException e) {
+            System.out.println("Database Error! " + e.getMessage());
         }
         return role;
-
     }
+    public boolean verifyAccount(String username, String enteredCode) {
+        String sql = "SELECT securityCode FROM users WHERE username = ? AND status = 'INACTIVE'";
+        String updateSql = "UPDATE users SET status = 'ACTIVE' WHERE username = ?";
+
+        try (Connection conn = DatabaseConnection.getUserConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, username);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    String storedCode = rs.getString("securityCode");
+
+                    // Check if the entered code matches the one stored in the database
+                    if (storedCode != null && storedCode.equals(enteredCode.trim())) {
+                        try (PreparedStatement updateStmt = conn.prepareStatement(updateSql)) {
+                            updateStmt.setString(1, username);
+                            updateStmt.executeUpdate();
+                            System.out.println("\n[SUCCESS] Account successfully verified and activated!");
+                            return true;
+                        }
+                    } else {
+                        System.out.println("\n[ERROR] Invalid security code.");
+                    }
+                } else {
+                    System.out.println("\n[ERROR] User not found or already active.");
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Verification Error: " + e.getMessage());
+        }
+        return false;
+    }
+    public boolean isUserActive(String username) {
+        String sql = "SELECT status FROM users WHERE username = ?";
+        try (Connection conn = DatabaseConnection.getUserConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, username);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    String status = rs.getString("status");
+                    return "ACTIVE".equalsIgnoreCase(status);
+                }
+            }
+        } catch (SQLException e) {
+            System.out.println("Error checking user status: " + e.getMessage());
+        }
+        return false;
+    }
+
 
 }
