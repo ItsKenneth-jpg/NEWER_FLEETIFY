@@ -46,6 +46,7 @@ public class Main {
 
                     if (isloggedIn) {
                         String userRole = userDAOO.role(loginuser, loginPass);
+                        activityLogDAO.LogLogin(loginuser, "LOGIN");
 
                         if (userRole != null) {
                             if (userRole.equalsIgnoreCase("ADMIN")) {
@@ -64,6 +65,71 @@ public class Main {
 
                                     switch (choicee) {
                                         case "1":
+                                            UserDAO userDAO = new UserDAO();
+                                            Scanner sc = new Scanner(System.in);
+
+
+                                            System.out.println("\n================================");
+                                            System.out.println("            REGISTER");
+                                            System.out.println("================================");
+
+                                            System.out.print("Enter Username: ");
+                                            String username = sc.nextLine().trim();
+
+                                            System.out.print("Enter Password: ");
+                                            String password = sc.nextLine().trim();
+
+
+                                            System.out.print("Enter role (e.g., ADMIN, USER): ");
+                                            String role = sc.nextLine().trim();
+
+                                            if ("ADMIN".equalsIgnoreCase(role)) {
+                                                if (userDAO.adminExists()) {
+                                                    System.out.println("Registration failed: An admin account already exists.");
+                                                    break;
+                                                }
+                                            }
+
+// Call registerUser with 4 arguments including email
+                                            boolean success = userDAO.registerUser(username, password, role);
+
+                                            if (success) {
+                                                System.out.println("\n[SUCCESS] Registration completed!");
+
+                                                // OPTIONAL HELPER: Check if this specific user needs activation (i.e., they are INACTIVE)
+                                                // If they are the first user, their status is ACTIVE, so we skip the prompt entirely!
+                                                if (!userDAO.isUserActive(username)) {
+                                                    int maxAttempts = 5;
+                                                    boolean verified = false;
+
+                                                    for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+                                                        System.out.print("Enter the 6-digit security code sent to the admin email (Attempt " + attempt + "/" + maxAttempts + "): ");
+                                                        String enteredCode = sc.nextLine().trim();
+
+                                                        verified = userDAO.verifyAccount(username, enteredCode);
+                                                        if (verified) {
+                                                            System.out.println("Account is now ACTIVE. You can log in.");
+                                                            break; // Exit loop immediately on success
+                                                        } else {
+                                                            int attemptsLeft = maxAttempts - attempt;
+                                                            if (attemptsLeft > 0) {
+                                                                System.out.println("Incorrect code. You have " + attemptsLeft + " attempt(s) remaining.\n");
+                                                            }
+                                                        }
+                                                    }
+
+                                                    // Triggers if they fail all 5 attempts
+                                                    if (!verified) {
+                                                        System.out.println("\n[LOCKED/FAILED] Verification failed. Ask the admin for activating the account.");
+                                                    }
+
+                                                } else {
+                                                    System.out.println("First account is automatically active. No code required!");
+                                                }
+
+                                            } else {
+                                                System.out.println("\n[FAILED] Registration rejected.");
+                                            }
                                             break;
                                         case "2":
                                             break;
@@ -73,6 +139,7 @@ public class Main {
                                             break;
                                         case "0":
                                             System.out.println("returning...");
+                                            activityLogDAO.loglogout(loginuser, "LOGOUT");
                                             break dashboardloop;
                                         default:
                                             System.out.println("Error: Invalid Option.");
@@ -83,10 +150,15 @@ public class Main {
                             }
                         }
                     }
+                    else {
+                        System.out.println("No Account found.");
+                        break;
+                    }
                     break;
 
                 case "2":
                     UserDAO userDAO = new UserDAO();
+                    ActivityLogDAO activityLogDAO1 = new ActivityLogDAO();
                     Scanner sc = new Scanner(System.in);
 
                     System.out.println("\n================================");
@@ -100,51 +172,89 @@ public class Main {
                     String password = sc.nextLine().trim();
 
 
-                    System.out.print("Enter role (e.g., ADMIN, USER): ");
-                    String role = sc.nextLine().trim();
+                    String Role;
+
+                    if(!userDAO.adminExists()){
+                        Role = "ADMIN";
+                        System.out.println("First Account detected!");
+
+
+
+                        boolean success = userDAO.registerUser(username, password, Role);
+
+
+
+                        if(!success){
+
+
+
+                            System.out.println("\n[FAILED] Registration rejected.");
+
+                        }
+                        break;
+
+                    }
+                    else {
+                        System.out.print("Enter role (e.g., ADMIN, USER): ");
+                        String role = sc.nextLine().trim();
+
+                        if(role.equals("Fleet Dispatcher") || role.equals("Transit Scheduler")){
+
 
 // Call registerUser with 4 arguments including email
-                    boolean success = userDAO.registerUser(username, password, role);
+                            boolean success = userDAO.registerUser(username, password, role);
 
-                    if (success) {
-                        System.out.println("\n[SUCCESS] Registration completed!");
+                            if (success) {
+                                System.out.println("\n[SUCCESS] Registration completed!");
 
-                        // OPTIONAL HELPER: Check if this specific user needs activation (i.e., they are INACTIVE)
-                        // If they are the first user, their status is ACTIVE, so we skip the prompt entirely!
-                        if (!userDAO.isUserActive(username)) {
-                            int maxAttempts = 5;
-                            boolean verified = false;
+                                // OPTIONAL HELPER: Check if this specific user needs activation (i.e., they are INACTIVE)
+                                // If they are the first user, their status is ACTIVE, so we skip the prompt entirely!
+                                if (!userDAO.isUserActive(username)) {
+                                    int maxAttempts = 5;
+                                    boolean verified = false;
 
-                            for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-                                System.out.print("Enter the 6-digit security code sent to the admin email (Attempt " + attempt + "/" + maxAttempts + "): ");
-                                String enteredCode = sc.nextLine().trim();
+                                    for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+                                        System.out.print("Enter the 6-digit security code sent to the admin email (Attempt " + attempt + "/" + maxAttempts + "): ");
+                                        String enteredCode = sc.nextLine().trim();
 
-                                verified = userDAO.verifyAccount(username, enteredCode);
-                                if (verified) {
-                                    System.out.println("Account is now ACTIVE. You can log in.");
-                                    break; // Exit loop immediately on success
-                                } else {
-                                    int attemptsLeft = maxAttempts - attempt;
-                                    if (attemptsLeft > 0) {
-                                        System.out.println("Incorrect code. You have " + attemptsLeft + " attempt(s) remaining.\n");
+                                        verified = userDAO.verifyAccount(username, enteredCode);
+                                        if (verified) {
+                                            System.out.println("Account is now ACTIVE. You can log in.");
+
+                                            break; // Exit loop immediately on success
+                                        } else {
+                                            int attemptsLeft = maxAttempts - attempt;
+                                            if (attemptsLeft > 0) {
+                                                System.out.println("Incorrect code. You have " + attemptsLeft + " attempt(s) remaining.\n");
+                                            }
+                                        }
                                     }
+                                    activityLogDAO1.registerlog(username, "Register");
+
+                                    // Triggers if they fail all 5 attempts
+                                    if (!verified) {
+                                        System.out.println("\n[LOCKED/FAILED] Verification failed. Ask the admin for activating the account.");
+                                        activityLogDAO1.registerlog(username, "Not Active");
+                                    }
+
                                 }
-                            }
 
-                            // Triggers if they fail all 5 attempts
-                            if (!verified) {
-                                System.out.println("\n[LOCKED/FAILED] Verification failed. Ask the admin for activating the account.");
+                            } else {
+                                System.out.println("\n[FAILED] Registration rejected.");
                             }
-
-                        } else {
-                            System.out.println("First account is automatically active. No code required!");
                         }
+                        else if ("ADMIN".equalsIgnoreCase(role)) {
+                            if (userDAO.adminExists()) {
+                                System.out.println("Registration failed: An admin account already exists.");
+                                break;
+                            }
+                        }
+                        else {
+                            System.out.println("\n[ERROR] Invalid role. Only 'FLEET DISPATCHER' or 'TRANSIT SCHEDULER' are allowed.");
 
-                    } else {
-                        System.out.println("\n[FAILED] Registration rejected.");
-                    }
-
-
+                            break;
+                        }
+                        }
 
                     break;
 

@@ -37,7 +37,7 @@ public class UserDAO {
 
     public boolean registerUser(String username, String password, String role) {
 
-        // 1. Check if username already exists in the 'users' table
+
         if (isUserExists(username)) {
             System.out.println("Error: Username '" + username + "' is already taken.");
             return false;
@@ -98,7 +98,7 @@ public class UserDAO {
                         System.out.println(" [SECURITY CODE SENT TO ADMIN EMAIL]: " + ADMIN_EMAIL);
                         System.out.println("--------------------------------------------------\n");
 
-                        System.out.println("Security code successfully saved to database: " + securityCode);
+
                     }
                     return true;
                 }
@@ -111,6 +111,7 @@ public class UserDAO {
 
         return false;
     }
+
     public static boolean login(String username, String password) {
         String userSql = "SELECT * FROM users WHERE username = ? AND password = ?";
 
@@ -273,6 +274,21 @@ public class UserDAO {
         }
         return false;
     }
+    public boolean adminExists() {
+        String sql = "SELECT COUNT(*) FROM users WHERE role = 'ADMIN'";
 
+        try (Connection conn = DriverManager.getConnection("jdbc:sqlite:initialize.db");
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
 
+            if (rs.next()) {
+                return rs.getInt(1) > 0;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
 }
+
+
