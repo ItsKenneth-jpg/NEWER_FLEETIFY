@@ -66,6 +66,7 @@ public class Main {
                                     switch (choicee) {
                                         case "1":
                                             UserDAO userDAO = new UserDAO();
+                                            ActivityLogDAO activityLogDAO11 = new ActivityLogDAO();
                                             Scanner sc = new Scanner(System.in);
 
 
@@ -117,6 +118,8 @@ public class Main {
                                                             }
                                                         }
                                                     }
+                                                    String loggedAdmin = "ADMIN";
+                                                    activityLogDAO11.registerlog(username, role , loggedAdmin, "Registered");
 
                                                     // Triggers if they fail all 5 attempts
                                                     if (!verified) {
@@ -229,12 +232,15 @@ public class Main {
                                             }
                                         }
                                     }
-                                    activityLogDAO1.registerlog(username, "Register");
+                                    String loggedAdmin = null;
+                                    activityLogDAO1.registerlog(username, role , loggedAdmin, "Registered");
+
 
                                     // Triggers if they fail all 5 attempts
                                     if (!verified) {
                                         System.out.println("\n[LOCKED/FAILED] Verification failed. Ask the admin for activating the account.");
-                                        activityLogDAO1.registerlog(username, "Not Active");
+                                        String loggedAdminn = null;
+                                        activityLogDAO1.registerlog(username, role , loggedAdminn, "Not Active");
                                     }
 
                                 }
