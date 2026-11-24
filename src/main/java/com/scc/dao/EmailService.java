@@ -8,7 +8,7 @@ public class EmailService {
 
     public static void sendSecurityCode(String recipientEmail, String code) {
         final String senderEmail = "Kennethcanon99@gmail.com"; // Your system Gmail
-        final String appPassword = "yyvn ooom hpzk eevs";     // Your 16-digit Gmail App Password
+        final String appPassword = "hgie ihmj tngl nzar";     // Your 16-digit Gmail App Password
 
         Properties props = new Properties();
         props.put("mail.smtp.auth", "true");
@@ -35,6 +35,10 @@ public class EmailService {
 
         } catch (MessagingException e) {
             System.err.println("Failed to send email: " + e.getMessage());
+            e.printStackTrace();
+            if (e.getNextException() != null) {
+                e.getNextException().printStackTrace();
+            }
         }
     }
 }

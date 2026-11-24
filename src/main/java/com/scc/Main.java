@@ -154,7 +154,7 @@ public class Main {
                         }
                     }
                     else {
-                        System.out.println("No Account found.");
+                        System.out.println("Login failed. Please try again.");
                         break;
                     }
                     break;

@@ -113,16 +113,21 @@ public class UserDAO {
     }
 
     public static boolean login(String username, String password) {
-        String userSql = "SELECT * FROM users WHERE username = ? AND password = ?";
+        String userSql = "SELECT password FROM users WHERE username = ?";
 
         try (Connection conn = DatabaseConnection.getUserConnection();
              PreparedStatement pstmt = conn.prepareStatement(userSql)) {
 
             pstmt.setString(1, username);
-            pstmt.setString(2, password);
 
             try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
+                if (!rs.next()) {
+                    System.out.println("Username not found!");
+                    return false;
+                } else if (!password.equals(rs.getString("password"))) {
+                    System.out.println("Wrong password!");
+                    return false;
+                } else {
                     System.out.println("Login Success!");
                     return true;
                 }
