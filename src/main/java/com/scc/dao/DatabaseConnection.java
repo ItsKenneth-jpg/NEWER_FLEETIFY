@@ -30,4 +30,7 @@ public class DatabaseConnection {
     public static Connection getCompletedRoute() throws SQLException{
         return DriverManager.getConnection((INITIALIZE_DB_URL));
     }
+    public static Connection gettransfertTrip() throws SQLException{
+        return DriverManager.getConnection((INITIALIZE_DB_URL));
+    }
 }

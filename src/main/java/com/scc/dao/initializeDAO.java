@@ -76,7 +76,7 @@ public class initializeDAO {
     public static boolean createOngoingRouteTable() {
         String sql = """
                 CREATE TABLE IF NOT EXISTS Ongoingroute (
-                    id TEXT PRIMARY KEY,
+                    id TEXT,
                     route_id TEXT NOT NULL,
                     origin TEXT NOT NULL,
                     destination TEXT NOT NULL,
@@ -161,6 +161,7 @@ public class initializeDAO {
             return false;
         }
     }
+
 
 
     /**
@@ -514,8 +515,8 @@ public class initializeDAO {
      */
     public static boolean updateTripStatus(String tripId, String newStatus) {
         createOngoingRouteTable();
-        String selectSql = "SELECT driver_id, vehicle_id, route_id FROM route WHERE UPPER(TRIM(id)) = UPPER(TRIM(?))";
-        String updateTripSql = "UPDATE route SET status = ? WHERE UPPER(TRIM(id)) = UPPER(TRIM(?))";
+        String selectSql = "SELECT driver_id, vehicle_id, route_id FROM Ongoingroute WHERE UPPER(TRIM(id)) = UPPER(TRIM(?))";
+        String updateTripSql = "UPDATE Ongoingroute SET status = ? WHERE UPPER(TRIM(id)) = UPPER(TRIM(?))";
 
         String driverId = null;
         String vehicleId = null;
@@ -546,6 +547,11 @@ public class initializeDAO {
         } catch (SQLException e) {
             System.out.println("Database Error updating trip status: " + e.getMessage());
             return false;
+        }
+        if("Cancel".equals(newStatus)){
+            System.out.println("returning...");
+
+
         }
 
         if ("COMPLETED".equalsIgnoreCase(newStatus)
@@ -884,7 +890,7 @@ public class initializeDAO {
         createOngoingRouteTable();
         String sql = """
                 SELECT id, route_id, origin, destination, vehicle_id, vehicle_type, driver_id, driver, assigned_by, status
-                FROM ongoing_route
+                FROM Ongoingroute
                 WHERE UPPER(TRIM(COALESCE(status, ''))) <> 'COMPLETED'
                 """;
 
@@ -968,6 +974,39 @@ public class initializeDAO {
 
         } catch (SQLException e) {
             System.out.println("Error displaying completed trips: " + e.getMessage());
+            return false;
+        }
+    }
+    public boolean transferTrip(String tripId) {
+        String insertSql = "INSERT OR IGNORE INTO completed_trip SELECT * FROM Ongoingroute WHERE trip_id = ? AND status = 'COMPLETED'";
+        String deleteSql = "DELETE FROM Ongoingroute WHERE trip_id = ? AND status = 'COMPLETED'";
+
+        try (Connection conn = DatabaseConnection.gettransfertTrip()) {
+            conn.setAutoCommit(false);
+
+            try (PreparedStatement insertStmt = conn.prepareStatement(insertSql);
+                 PreparedStatement deleteStmt = conn.prepareStatement(deleteSql)) {
+
+                insertStmt.setString(1, tripId);
+                deleteStmt.setString(1, tripId);
+
+                int rowsInserted = insertStmt.executeUpdate();
+                if (rowsInserted > 0) {
+                    deleteStmt.executeUpdate();
+                }
+
+                conn.commit();
+                return rowsInserted > 0;
+
+            } catch (SQLException e) {
+                conn.rollback();
+                e.printStackTrace();
+                return false;
+            } finally {
+                conn.setAutoCommit(true);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
             return false;
         }
     }

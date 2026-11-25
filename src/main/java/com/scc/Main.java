@@ -155,7 +155,7 @@ public class Main {
             }
         }
     }
-
+//USE FOR REGISTERING A USER, DRIVER, VEHICLE, AND SO ON...
     private static void handleAdminRegisterMenu(String currentLoggedInAdmin) {
         while (true) {
             System.out.println("\n================================");
@@ -192,7 +192,7 @@ public class Main {
             }
         }
     }
-
+//USE FOR REGISTERING A USER
     private static void registerUserByAdmin(String currentLoggedInAdmin) {
         System.out.println("\n================================");
         System.out.println("         REGISTER USER");
@@ -241,7 +241,7 @@ public class Main {
             System.out.println("\n[FAILED] Registration rejected.");
         }
     }
-
+//USE FORE REGISTERING A DRIVER
     private static void registerDriver() {
         System.out.println("\n================================");
         System.out.println("        REGISTER DRIVER");
@@ -293,7 +293,7 @@ public class Main {
             System.out.println("[FAILED] Could not register driver.");
         }
     }
-
+//USE FOR REGISTERING VEHICLE
     private static void registerVehicle() {
         System.out.println("\n================================");
         System.out.println("       REGISTER VEHICLE");
@@ -353,7 +353,7 @@ public class Main {
             System.out.println("[FAILED] Could not register vehicle.");
         }
     }
-
+//REGISTERING FOR ROUTE
     private static void registerRoute() {
         System.out.println("\n================================");
         System.out.println("        REGISTER ROUTE");
@@ -384,7 +384,7 @@ public class Main {
             System.out.println("[FAILED] Could not register route.");
         }
     }
-
+// ASSIGNING A TRIP
     private static void assignTrip(String currentLoggedInAdmin) {
         System.out.println("\n================================");
         System.out.println("          ASSIGN TRIP");
@@ -471,7 +471,7 @@ public class Main {
             System.out.println("[WARNING] Ongoing route saved, but one or more statuses failed to update.");
         }
     }
-
+//USE FOR VIEWING ALL DATA
     private static void handleAdminViewMenu() {
         while (true) {
             System.out.println("\n================================");
@@ -524,7 +524,7 @@ public class Main {
             }
         }
     }
-
+// USE FOR UPDATING DATA
     private static void handleAdminUpdateMenu() {
         while (true) {
             System.out.println("\n================================");
@@ -561,7 +561,7 @@ public class Main {
             }
         }
     }
-
+//USE FOR UPDATING USER STATUS
     private static void updateUserStatusMenu() {
         System.out.println("\n--- UPDATE USER STATUS ---");
         USER_DAO.displayAllUsers();
@@ -661,6 +661,9 @@ public class Main {
             return;
         }
 
+        initializeDAO tripDAO = new initializeDAO();
+        initializeDAO.createCompletedTripTable();
+
         boolean updated = initializeDAO.updateTripStatus(tripId, newStatus);
         if (updated) {
             System.out.println("[SUCCESS] Trip '" + tripId + "' status updated to " + newStatus + ".");
@@ -719,4 +722,5 @@ public class Main {
         }
         return verified;
     }
+
 }
