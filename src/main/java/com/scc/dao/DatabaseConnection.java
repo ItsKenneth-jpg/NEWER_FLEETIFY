@@ -24,4 +24,10 @@ public class DatabaseConnection {
     public static Connection getOngoingRoute() throws  SQLException{
         return DriverManager.getConnection(INITIALIZE_DB_URL);
     }
+    public static Connection getActivityLogConnection() throws SQLException{
+        return DriverManager.getConnection((INITIALIZE_DB_URL));
+    }
+    public static Connection getCompletedRoute() throws SQLException{
+        return DriverManager.getConnection((INITIALIZE_DB_URL));
+    }
 }

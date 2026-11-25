@@ -1,22 +1,32 @@
 package com.scc.dao;
 
 import java.sql.*;
+import java.util.Random;
+import java.util.Set;
 
 public class UserDAO {
+
+    private static final String ADMIN_EMAIL = "Kennethcanon99@gmail.com";
+
+    private static final Set<String> ALLOWED_ROLES = Set.of(
+            "FLEET DISPATCHER",
+            "TRANSIT SCHEDULER",
+            "ADMIN"
+    );
 
     // Constructor: Automatically verifies and creates the 'users' table on startup
     public UserDAO() {
         createTableIfNotExists();
     }
 
-    private void createTableIfNotExists() {
+    public static void createTableIfNotExists() {
         String sql = "CREATE TABLE IF NOT EXISTS users (" +
                 "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                 "username TEXT UNIQUE NOT NULL, " +
                 "password TEXT NOT NULL, " +
                 "email TEXT, " +
                 "securityCode TEXT, " +
-                "role TEXT NOT NULL, " +
+                "role TEXT NOT NULL CHECK (role IN ('FLEET DISPATCHER', 'TRANSIT SCHEDULER', 'ADMIN')), " +
                 "status TEXT NOT NULL)";
 
         try (Connection conn = DatabaseConnection.getUserConnection();
@@ -28,15 +38,27 @@ public class UserDAO {
     }
 
     // Generates a random 6-digit security code for email verification
-    private String generateSecurityCode() {
-        int code = 100000 + new java.util.Random().nextInt(900000);
+    private static String generateSecurityCode() {
+        int code = 100000 + new Random().nextInt(900000);
         return String.valueOf(code);
     }
 
-    private static final String ADMIN_EMAIL = "Kennethcanon99@gmail.com";
+    private static String normalizeAndValidateRole(String role) {
+        if (role == null || role.isBlank()) {
+            return null;
+        }
+        String cleaned = role.trim().toUpperCase();
+        return ALLOWED_ROLES.contains(cleaned) ? cleaned : null;
+    }
 
     public boolean registerUser(String username, String password, String role) {
+        createTableIfNotExists();
 
+        String normalizedRole = normalizeAndValidateRole(role);
+        if (normalizedRole == null) {
+            System.out.println("Error: Invalid role '" + role + "'. Allowed roles are: FLEET DISPATCHER, TRANSIT SCHEDULER.");
+            return false;
+        }
 
         if (isUserExists(username)) {
             System.out.println("Error: Username '" + username + "' is already taken.");
@@ -48,8 +70,7 @@ public class UserDAO {
 
         try (Connection conn = DatabaseConnection.getUserConnection()) {
 
-            // 2. Check table count to determine if this is the very first user
-            int userCount = 1;
+            int userCount = 0;
             try (Statement stmt = conn.createStatement();
                  ResultSet rs = stmt.executeQuery(countSql)) {
                 if (rs.next()) {
@@ -59,7 +80,6 @@ public class UserDAO {
 
             boolean isFirstUser = (userCount == 0);
 
-            // Reset the auto-increment sequence back if the table is empty
             if (isFirstUser) {
                 String resetSeqSql = "DELETE FROM sqlite_sequence WHERE name='users'";
                 try (Statement stmt = conn.createStatement()) {
@@ -72,13 +92,11 @@ public class UserDAO {
             String status = isFirstUser ? "ACTIVE" : "INACTIVE";
             String securityCode = isFirstUser ? null : generateSecurityCode();
 
-            // 3. Insert the new user into the 'users' table
             try (PreparedStatement pstmt = conn.prepareStatement(insertSql)) {
-
                 pstmt.setString(1, username);
                 pstmt.setString(2, password);
                 pstmt.setString(3, securityCode);
-                pstmt.setString(4, role.toUpperCase());
+                pstmt.setString(4, normalizedRole);
                 pstmt.setString(5, status);
 
                 int rowsAffected = pstmt.executeUpdate();
@@ -90,19 +108,15 @@ public class UserDAO {
                         System.out.println(" Status: ACTIVE (Directly logged in, no code required)");
                         System.out.println("--------------------------------------------------\n");
                     } else {
-                        // Send security code to the fixed ADMIN email
                         EmailService.sendSecurityCode(ADMIN_EMAIL, securityCode);
 
                         System.out.println("\n--------------------------------------------------");
                         System.out.println(" [SUCCESS] Account created! Status: INACTIVE");
                         System.out.println(" [SECURITY CODE SENT TO ADMIN EMAIL]: " + ADMIN_EMAIL);
                         System.out.println("--------------------------------------------------\n");
-
-
                     }
                     return true;
                 }
-
             }
 
         } catch (SQLException e) {
@@ -113,6 +127,7 @@ public class UserDAO {
     }
 
     public static boolean login(String username, String password) {
+        createTableIfNotExists();
         String userSql = "SELECT password FROM users WHERE username = ?";
 
         try (Connection conn = DatabaseConnection.getUserConnection();
@@ -139,12 +154,20 @@ public class UserDAO {
     }
 
     public boolean updateUser(String username, String newRole, String newStatus) {
+        createTableIfNotExists();
+
+        String normalizedRole = normalizeAndValidateRole(newRole);
+        if (normalizedRole == null) {
+            System.out.println("Error: Invalid role '" + newRole + "'. Allowed roles are: FLEET DISPATCHER, TRANSIT SCHEDULER.");
+            return false;
+        }
+
         String updatesql = "UPDATE users SET role = ?, status = ? WHERE username = ?";
 
         try (Connection conn = DatabaseConnection.getUserConnection();
              PreparedStatement pstmt = conn.prepareStatement(updatesql)) {
 
-            pstmt.setString(1, newRole);
+            pstmt.setString(1, normalizedRole);
             pstmt.setString(2, newStatus);
             pstmt.setString(3, username);
 
@@ -157,6 +180,7 @@ public class UserDAO {
     }
 
     public void displayAllUsers() {
+        createTableIfNotExists();
         String sql = "SELECT id, username, securityCode, role, status FROM users";
 
         try (Connection conn = DatabaseConnection.getUserConnection();
@@ -192,6 +216,7 @@ public class UserDAO {
     }
 
     public boolean isUserExists(String username) {
+        createTableIfNotExists();
         String sql = "SELECT COUNT(*) FROM users WHERE username = ?";
 
         try (Connection conn = DatabaseConnection.getUserConnection();
@@ -211,6 +236,7 @@ public class UserDAO {
     }
 
     public String role(String username, String password) {
+        createTableIfNotExists();
         String role = null;
         String query = "SELECT role FROM users WHERE username = ? AND password = ?";
 
@@ -231,7 +257,9 @@ public class UserDAO {
         }
         return role;
     }
+
     public boolean verifyAccount(String username, String enteredCode) {
+        createTableIfNotExists();
         String sql = "SELECT securityCode FROM users WHERE username = ? AND status = 'INACTIVE'";
         String updateSql = "UPDATE users SET status = 'ACTIVE' WHERE username = ?";
 
@@ -243,7 +271,6 @@ public class UserDAO {
                 if (rs.next()) {
                     String storedCode = rs.getString("securityCode");
 
-                    // Check if the entered code matches the one stored in the database
                     if (storedCode != null && storedCode.equals(enteredCode.trim())) {
                         try (PreparedStatement updateStmt = conn.prepareStatement(updateSql)) {
                             updateStmt.setString(1, username);
@@ -263,7 +290,9 @@ public class UserDAO {
         }
         return false;
     }
+
     public boolean isUserActive(String username) {
+        createTableIfNotExists();
         String sql = "SELECT status FROM users WHERE username = ?";
         try (Connection conn = DatabaseConnection.getUserConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -279,10 +308,12 @@ public class UserDAO {
         }
         return false;
     }
+
     public boolean adminExists() {
+        createTableIfNotExists();
         String sql = "SELECT COUNT(*) FROM users WHERE role = 'ADMIN'";
 
-        try (Connection conn = DriverManager.getConnection("jdbc:sqlite:initialize.db");
+        try (Connection conn = DatabaseConnection.getUserConnection();
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
 
@@ -294,6 +325,47 @@ public class UserDAO {
         }
         return false;
     }
+    public boolean updateUserStatus(String username, String newStatus) {
+        // Check your users table/column names in initialize.db if they differ (e.g., user_status or account_status)
+        String sql = "UPDATE users SET status = ? WHERE LOWER(TRIM(username)) = LOWER(TRIM(?))";
+
+        try (Connection conn = DatabaseConnection.getUserConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, newStatus);
+            pstmt.setString(2, username);
+            return pstmt.executeUpdate() > 0;
+
+        } catch (SQLException e) {
+            System.out.println("Error updating user status: " + e.getMessage());
+            return false;
+        }
+    }
+    public boolean sendActivationCode(String username) {
+        createTableIfNotExists();
+
+        if (!isUserExists(username)) {
+            System.out.println("[ERROR] User '" + username + "' not found.");
+            return false;
+        }
+
+        String newCode = generateSecurityCode();
+        String updateSql = "UPDATE users SET securityCode = ? WHERE username = ?";
+
+        try (Connection conn = DatabaseConnection.getUserConnection();
+             PreparedStatement pstmt = conn.prepareStatement(updateSql)) {
+
+            pstmt.setString(1, newCode);
+            pstmt.setString(2, username);
+
+            if (pstmt.executeUpdate() > 0) {
+                EmailService.sendSecurityCode(ADMIN_EMAIL, newCode);
+                System.out.println("[SECURITY CODE SENT TO ADMIN EMAIL]: " + ADMIN_EMAIL);
+                return true;
+            }
+        } catch (SQLException e) {
+            System.out.println("Error generating/saving security code: " + e.getMessage());
+        }
+        return false;
+    }
 }
-
-

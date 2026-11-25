@@ -6,10 +6,41 @@ public class adminDAO {
 
     private static final String ADMIN_CODE = "FLEETIFY-ADMIN";
 
+    public adminDAO() {
+        initializeTables();
+    }
 
+    public static void createAdminTable() {
+        String sql = """
+                CREATE TABLE IF NOT EXISTS admin (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT UNIQUE NOT NULL,
+                    password TEXT NOT NULL,
+                    email TEXT,
+                    securityCode TEXT,
+                    role TEXT NOT NULL DEFAULT 'ADMIN',
+                    status TEXT NOT NULL DEFAULT 'ACTIVE'
+                )
+                """;
+
+        try (Connection conn = DatabaseConnection.getUserConnection();
+             Statement stmt = conn.createStatement()) {
+            stmt.execute(sql);
+        } catch (SQLException e) {
+            System.out.println("Database Error creating admin table: " + e.getMessage());
+        }
+    }
+
+
+
+    public static void initializeTables() {
+        createAdminTable();
+
+    }
 
     // Removed 'id' from parameters since the database auto-increments it
     public boolean login(String username, String password) {
+        initializeTables();
 
         // --- STEP 1: Check the ADMIN table first ---
         String adminSql = "SELECT * FROM admin WHERE username = ? AND password = ?";
@@ -31,7 +62,7 @@ public class adminDAO {
             System.out.println("Database Error checking admin: " + e.getMessage());
         }
 
-
+        // --- STEP 2: Check the USER table ---
         String userSql = "SELECT * FROM user WHERE username = ? AND password = ?";
 
         try (Connection conn = DatabaseConnection.getUserConnection();
@@ -55,7 +86,7 @@ public class adminDAO {
                     return true;
 
                 } else {
-                    // Not found in admin OR users table
+                    // Not found in admin OR user table
                     System.out.println("Error: Invalid username or password.");
                     return false;
                 }
@@ -65,36 +96,12 @@ public class adminDAO {
             return false;
         }
     }
-    public boolean updateAdmin (String username, String newStatus){
+
+    public boolean updateAdmin(String username, String newStatus) {
+        createAdminTable();
         String updatesql = "UPDATE admin SET status = ? WHERE username = ?";
 
-        try (Connection conn = DriverManager.getConnection("jdbc:sqlite:users.db");
-             PreparedStatement pstmt = conn.prepareStatement(updatesql)){
-
-            pstmt.setString(1, newStatus);
-            pstmt.setString(2, username);
-
-            // pstmt.executeUpdate() returns the number of rows changed
-            int rowsAffected = pstmt.executeUpdate();
-
-            // If rowsAffected > 0, it means the username existed and was successfully updated!
-            return rowsAffected > 0;
-
-        } catch(SQLException e) {
-            System.out.println("Error updating user status: " + e.getMessage());
-            return false;
-        }
-    }
-    public boolean updateUserStatusSafely(String username, String newStatus, String currentAdmin) {
-        // Block self-deactivation at the database logic level
-        if (username.equalsIgnoreCase(currentAdmin) && newStatus.equalsIgnoreCase("INACTIVE")) {
-            System.out.println("Security Error: Admins are not allowed to deactivate their own account.");
-            return false;
-        }
-
-        String updatesql = "UPDATE user SET status = ? WHERE username = ?";
-
-        try (Connection conn = DriverManager.getConnection("jdbc:sqlite:users.db");
+        try (Connection conn = DatabaseConnection.getUserConnection();
              PreparedStatement pstmt = conn.prepareStatement(updatesql)) {
 
             pstmt.setString(1, newStatus);
@@ -103,22 +110,51 @@ public class adminDAO {
             int rowsAffected = pstmt.executeUpdate();
             return rowsAffected > 0;
 
-        } catch(SQLException e) {
+        } catch (SQLException e) {
+            System.out.println("Error updating admin status: " + e.getMessage());
+            return false;
+        }
+    }
+
+    public boolean updateUserStatusSafely(String username, String newStatus, String currentAdmin) {
+
+
+        // Block self-deactivation at the database logic level
+        if (username != null && currentAdmin != null
+                && username.equalsIgnoreCase(currentAdmin)
+                && "INACTIVE".equalsIgnoreCase(newStatus)) {
+            System.out.println("Security Error: Admins are not allowed to deactivate their own account.");
+            return false;
+        }
+
+        String updatesql = "UPDATE user SET status = ? WHERE username = ?";
+
+        try (Connection conn = DatabaseConnection.getUserConnection();
+             PreparedStatement pstmt = conn.prepareStatement(updatesql)) {
+
+            pstmt.setString(1, newStatus);
+            pstmt.setString(2, username);
+
+            int rowsAffected = pstmt.executeUpdate();
+            return rowsAffected > 0;
+
+        } catch (SQLException e) {
             System.out.println("Error updating user status: " + e.getMessage());
             return false;
         }
     }
+
     public void displayAllUsers() {
+        createAdminTable();
         String sql = "SELECT id, username, securityCode, role, status FROM admin";
 
-        try (Connection conn = DriverManager.getConnection("jdbc:sqlite:users.db");
+        try (Connection conn = DatabaseConnection.getUserConnection();
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
 
             System.out.println("\n=====================================================================================");
             System.out.println("                               REGISTERED USERS LIST                                 ");
             System.out.println("=====================================================================================");
-            // Formatted header matching your 5 columns
             System.out.printf("%-5s | %-18s | %-16s | %-20s | %-10s\n", "ID", "Username", "Security Code", "Role", "Status");
             System.out.println("-------------------------------------------------------------------------------------");
 
@@ -128,7 +164,7 @@ public class adminDAO {
                 System.out.printf("%-5s | %-18s | %-16s | %-20s | %-10s\n",
                         rs.getString("id"),
                         rs.getString("username"),
-                        rs.getString("securityCode"), // Matches your exact column name
+                        rs.getString("securityCode"),
                         rs.getString("role"),
                         rs.getString("status")
                 );
