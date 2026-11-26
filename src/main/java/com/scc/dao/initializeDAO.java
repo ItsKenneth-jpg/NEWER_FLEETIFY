@@ -93,15 +93,15 @@ public class initializeDAO {
              Statement stmt = conn.createStatement()) {
 
             stmt.execute(sql);
-            ensureColumnExists(conn, "route", "route_id", "TEXT NOT NULL DEFAULT ''");
-            ensureColumnExists(conn, "route", "origin", "TEXT NOT NULL DEFAULT ''");
-            ensureColumnExists(conn, "route", "destination", "TEXT NOT NULL DEFAULT ''");
-            ensureColumnExists(conn, "route", "vehicle_id", "TEXT NOT NULL DEFAULT ''");
-            ensureColumnExists(conn, "route", "vehicle_type", "TEXT NOT NULL DEFAULT ''");
-            ensureColumnExists(conn, "route", "driver_id", "TEXT NOT NULL DEFAULT ''");
-            ensureColumnExists(conn, "route", "driver", "TEXT NOT NULL DEFAULT ''");
-            ensureColumnExists(conn, "route", "assigned_by", "TEXT NOT NULL DEFAULT ''");
-            ensureColumnExists(conn, "route", "status", "TEXT NOT NULL DEFAULT 'ONGOING'");
+            ensureColumnExists(conn, "Ongoingroute", "route_id", "TEXT NOT NULL DEFAULT ''");
+            ensureColumnExists(conn, "Ongoingroute", "origin", "TEXT NOT NULL DEFAULT ''");
+            ensureColumnExists(conn, "Ongoingroute", "destination", "TEXT NOT NULL DEFAULT ''");
+            ensureColumnExists(conn, "Ongoingroute", "vehicle_id", "TEXT NOT NULL DEFAULT ''");
+            ensureColumnExists(conn, "Ongoingroute", "vehicle_type", "TEXT NOT NULL DEFAULT ''");
+            ensureColumnExists(conn, "Ongoingroute", "driver_id", "TEXT NOT NULL DEFAULT ''");
+            ensureColumnExists(conn, "Ongoingroute", "driver", "TEXT NOT NULL DEFAULT ''");
+            ensureColumnExists(conn, "Ongoingroute", "assigned_by", "TEXT NOT NULL DEFAULT ''");
+            ensureColumnExists(conn, "Ongoingroute", "status", "TEXT NOT NULL DEFAULT 'ONGOING'");
             return true;
 
         } catch (SQLException e) {
@@ -172,6 +172,7 @@ public class initializeDAO {
         createDriverTable();
         createRouteTable();
         createOngoingRouteTable();
+        createCompletedTripTable();
     }
 
     public static boolean registerVehicle(String id, String plateNumber, int capacity, String type, String status) {
@@ -541,6 +542,12 @@ public class initializeDAO {
                 updateStmt.setString(2, tripId);
                 if (updateStmt.executeUpdate() <= 0) {
                     return false;
+                }
+                if ("COMPLETED".equalsIgnoreCase(newStatus)) {
+                    boolean transferred = transferTrip(tripId);
+                    if (transferred) {
+                        System.out.println("[INFO] Trip '" + tripId + "' transferred from Ongoingroute to completed_trip.");
+                    }
                 }
             }
 
@@ -977,11 +984,32 @@ public class initializeDAO {
             return false;
         }
     }
-    public boolean transferTrip(String tripId) {
-        String insertSql = "INSERT OR IGNORE INTO completed_trip SELECT * FROM Ongoingroute WHERE trip_id = ? AND status = 'COMPLETED'";
-        String deleteSql = "DELETE FROM Ongoingroute WHERE trip_id = ? AND status = 'COMPLETED'";
+    public static boolean transferTrip(String tripId) {
+        createOngoingRouteTable();
+        createCompletedTripTable();
 
-        try (Connection conn = DatabaseConnection.gettransfertTrip()) {
+        String insertSql = """
+                INSERT OR IGNORE INTO completed_trip (
+                    id, route_id, origin, destination,
+                    vehicle_id, vehicle_type, driver_id, driver,
+                    assigned_by, status
+                )
+                SELECT
+                    id, route_id, origin, destination,
+                    vehicle_id, vehicle_type, driver_id, driver,
+                    assigned_by, 'COMPLETED'
+                FROM Ongoingroute
+                WHERE UPPER(TRIM(id)) = UPPER(TRIM(?))
+                  AND UPPER(TRIM(status)) = 'COMPLETED'
+                """;
+
+        String deleteSql = """
+                DELETE FROM Ongoingroute
+                WHERE UPPER(TRIM(id)) = UPPER(TRIM(?))
+                  AND UPPER(TRIM(status)) = 'COMPLETED'
+                """;
+
+        try (Connection conn = DatabaseConnection.getOngoingRoute()) {
             conn.setAutoCommit(false);
 
             try (PreparedStatement insertStmt = conn.prepareStatement(insertSql);
@@ -1000,13 +1028,13 @@ public class initializeDAO {
 
             } catch (SQLException e) {
                 conn.rollback();
-                e.printStackTrace();
+                System.out.println("Database Error transferring trip: " + e.getMessage());
                 return false;
             } finally {
                 conn.setAutoCommit(true);
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            System.out.println("Connection Error transferring trip: " + e.getMessage());
             return false;
         }
     }

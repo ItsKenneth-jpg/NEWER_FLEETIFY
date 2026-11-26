@@ -508,10 +508,15 @@ public class Main {
                     USER_DAO.displayAllUsers();
                     break;
                 case "6":
-                    System.out.println("\n[INFO] Hook up Register Logs view to your ActivityLogDAO.");
+                    ActivityLogDAO activityLogDAO = new ActivityLogDAO();
+                    activityLogDAO.displayRegisterLogs();
+
+
                     break;
                 case "7":
-                    System.out.println("\n[INFO] Hook up Login Logs view to your ActivityLogDAO.");
+                    ActivityLogDAO activityLogDAO1 = new ActivityLogDAO();
+                    activityLogDAO1.displayLoginLogs();
+
                     break;
                 case "8":
                     initializeDAO.displayCompletedTrips();
@@ -722,5 +727,77 @@ public class Main {
         }
         return verified;
     }
+    private static void dispatchAssignedFleet(Scanner scanner, String dispatcherUsername) {
+        initializeDAO.createOngoingRouteTable();
 
+        System.out.println("\n--- DISPATCH ASSIGNED FLEET ---");
+        initializeDAO.displayActiveTrips();
+
+        System.out.print("Enter Trip ID to dispatch (e.g., TRP-001) or press Enter to assign new: ");
+        String tripId = scanner.nextLine().trim().toUpperCase();
+
+        if (!tripId.isEmpty()) {
+            // Marks an existing assigned/pending trip as ONGOING
+            boolean updated = initializeDAO.updateTripStatus(tripId, "ONGOING");
+            if (updated) {
+                System.out.println("[SUCCESS] Trip " + tripId + " is now ONGOING.");
+            } else {
+                System.out.println("[ERROR] Could not dispatch Trip ID: " + tripId);
+            }
+            return;
+        }
+
+        // Fallback: Create and immediately dispatch a new ongoing route if not pre-assigned
+        initializeDAO.displayIdleRoutes();
+        System.out.print("Enter Route ID (e.g., RTE-001): ");
+        String routeId = scanner.nextLine().trim().toUpperCase();
+        String[] routeDetails = initializeDAO.getIdleRouteDetails(routeId);
+        if (routeDetails == null) {
+            System.out.println("[ERROR] Route ID '" + routeId + "' is not available (IDLE).");
+            return;
+        }
+
+        initializeDAO.displayIdleVehicles();
+        System.out.print("Enter Vehicle ID (e.g., VEH-001): ");
+        String vehicleId = scanner.nextLine().trim().toUpperCase();
+        String vehicleType = initializeDAO.getIdleVehicleType(vehicleId);
+        if (vehicleType == null) {
+            System.out.println("[ERROR] Vehicle ID '" + vehicleId + "' is not available (IDLE).");
+            return;
+        }
+
+        initializeDAO.displayIdleDrivers();
+        System.out.print("Enter Driver ID (e.g., DRV-001): ");
+        String driverId = scanner.nextLine().trim().toUpperCase();
+        String driverName = initializeDAO.getIdleDriverName(driverId);
+        if (driverName == null) {
+            System.out.println("[ERROR] Driver ID '" + driverId + "' is not available (IDLE).");
+            return;
+        }
+
+        String newTripId = initializeDAO.generateNextTripId();
+        boolean saved = initializeDAO.saveOngoingRoute(
+                newTripId,
+                routeId,
+                routeDetails[0],
+                routeDetails[1],
+                vehicleId,
+                vehicleType,
+                driverId,
+                driverName,
+                dispatcherUsername,
+                "ONGOING"
+        );
+
+        if (saved) {
+            initializeDAO.updateRouteStatus(routeId, "ONGOING");
+            initializeDAO.updateVehicleStatus(vehicleId, "ONGOING");
+            initializeDAO.updateDriverStatus(driverId, "ONGOING");
+            System.out.println("[SUCCESS] Dispatched " + newTripId + " (" + routeDetails[0] + " -> " + routeDetails[1] + ").");
+        } else {
+            System.out.println("[ERROR] Failed to dispatch fleet.");
+        }
+    }
 }
+
+

@@ -144,64 +144,61 @@ public class ActivityLogDAO {
         }
     }
     public void displayRegisterLogs() {
-        // Replace table/column names below if yours differ in ActivityLogDAO.java
-        String sql = "SELECT * FROM registerlogs";
+        createRegisterLogsTable();
+        String sql = "SELECT id, username, role, operator, status, date FROM registerlogs ORDER BY id DESC";
 
-        try (Connection conn = DatabaseConnection.getActivityLogConnection(); // or whichever connection registerlog() uses
+        try (Connection conn = DatabaseConnection.getUserConnection();
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
 
-            System.out.println("\n=================================================================================");
-            System.out.println("                              REGISTER LOGS LIST                                 ");
-            System.out.println("=================================================================================");
-
-            ResultSetMetaData meta = rs.getMetaData();
-            int colCount = meta.getColumnCount();
-
-            // Print column headers dynamically so it works even if column names vary
-            for (int i = 1; i <= colCount; i++) {
-                System.out.printf("%-18s%s", meta.getColumnName(i), (i < colCount ? " | " : ""));
-            }
-            System.out.println("\n---------------------------------------------------------------------------------");
+            System.out.println("\n=========================================================================================================");
+            System.out.println("                                           REGISTER LOGS LIST                                            ");
+            System.out.println("=========================================================================================================");
+            System.out.printf("%-6s | %-18s | %-14s | %-16s | %-12s | %-20s%n",
+                    "ID", "Username", "Role", "Operator", "Status", "Date");
+            System.out.println("---------------------------------------------------------------------------------------------------------");
 
             boolean found = false;
             while (rs.next()) {
                 found = true;
-                for (int i = 1; i <= colCount; i++) {
-                    String val = rs.getString(i);
-                    System.out.printf("%-18s%s", (val != null ? val : ""), (i < colCount ? " | " : ""));
-                }
-                System.out.println();
+                System.out.printf("%-6d | %-18s | %-14s | %-16s | %-12s | %-20s%n",
+                        rs.getInt("id"),
+                        rs.getString("username"),
+                        rs.getString("role"),
+                        rs.getString("operator"),
+                        rs.getString("status"),
+                        rs.getString("date"));
             }
 
             if (!found) {
                 System.out.println("No register logs found.");
             }
-            System.out.println("=================================================================================");
+            System.out.println("=========================================================================================================");
 
         } catch (SQLException e) {
             System.out.println("Error displaying register logs: " + e.getMessage());
         }
     }
-    public void displayLoginLogs() {
-        // Match the table name and WHERE condition used in your LogLogin(...) method
-        String sql = "SELECT * FROM loginlogs WHERE UPPER(status) IN ('LOGIN', 'LOGOUT')";
 
-        try (Connection conn = DatabaseConnection.getActivityLogConnection(); // match LogLogin's connection
+    public void displayLoginLogs() {
+        createLoginLogsTable();
+        String sql = "SELECT * FROM loginlogs ORDER BY 1 DESC";
+
+        try (Connection conn = DatabaseConnection.getRouteConnection();
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
-
-            System.out.println("\n=================================================================================");
-            System.out.println("                                LOGIN LOGS LIST                                  ");
-            System.out.println("=================================================================================");
 
             ResultSetMetaData meta = rs.getMetaData();
             int colCount = meta.getColumnCount();
 
+            System.out.println("\n=========================================================================================");
+            System.out.println("                                    LOGIN LOGS LIST                                      ");
+            System.out.println("=========================================================================================");
+
             for (int i = 1; i <= colCount; i++) {
                 System.out.printf("%-18s%s", meta.getColumnName(i), (i < colCount ? " | " : ""));
             }
-            System.out.println("\n---------------------------------------------------------------------------------");
+            System.out.println("\n-----------------------------------------------------------------------------------------");
 
             boolean found = false;
             while (rs.next()) {
@@ -216,10 +213,11 @@ public class ActivityLogDAO {
             if (!found) {
                 System.out.println("No login logs found.");
             }
-            System.out.println("=================================================================================");
+            System.out.println("=========================================================================================");
 
         } catch (SQLException e) {
             System.out.println("Error displaying login logs: " + e.getMessage());
         }
     }
+
 }
